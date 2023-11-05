@@ -1,0 +1,216 @@
+<template>
+  <div class="login">
+    <!-- 头部 -->
+    <!-- $router.go(-1)返回上一个页面 -->
+    <van-nav-bar
+      title="会员登录"
+      left-arrow
+      @click-left="$router.go(-1)"
+    ></van-nav-bar>
+    <!-- 主体 -->
+    <div class="container">
+      <div class="title">
+        <h3>手机号登录</h3>
+        <p>未注册的手机号登录后将自动注册</p>
+      </div>
+
+      <div class="form">
+        <div class="form-item">
+          <input
+            v-model="mobile"
+            class="inp"
+            maxlength="11"
+            placeholder="请输入手机号码"
+            type="text"
+          />
+        </div>
+        <div class="form-item">
+          <input
+          v-model="picCode"
+            class="inp"
+            maxlength="5"
+            placeholder="请输入图形验证码"
+            type="text"
+          />
+          <img :src="picUrl" v-show="picUrl" alt="" @click="getPicCode" />
+        </div>
+        <div class="form-item">
+          <input class="inp" placeholder="请输入短信验证码" type="text" />
+          <button @click="getCode">
+            {{
+              second === totalSecond ? "获取验证码" : second + `秒后重新发送`
+            }}
+          </button>
+        </div>
+      </div>
+
+      <div class="login-btn" @click="CodeLogin">登录</div>
+    </div>
+  </div>
+</template>
+
+<script>
+import { getPicCode, getMsgCode, MsgCodeLogin } from '@/api/login'
+
+export default {
+  name: 'loginIndex',
+  data () {
+    return {
+      picCode: '', // 图形验证码
+      picKey: '',
+      picUrl: '',
+      totalSecond: 60, // 倒计时的总秒数
+      second: 60, // 表示当前时间
+      timerId: null,
+      mobile: '', // 手机验证码
+      msgCode: '246810' // 手机验证码
+    }
+  },
+  async created () {
+    this.getPicCode()
+  },
+  methods: {
+    // 获取图片验证码
+    async getPicCode () {
+      const res = await getPicCode()
+      // console.log(res.data)
+      const { base64, key } = res.data
+      this.picKey = key
+      this.picUrl = base64
+      // this.$toast('获取成功')
+    },
+    verifyFn () {
+      // 正则表达式来验证
+      if (!/^1[3-9]\d{9}$/.test(this.mobile)) {
+        this.$toast('请输入正确的手机号')
+        return false
+      }
+      if (!/^\w{4}$/.test(this.picCode)) {
+        this.$toast('请输入输入正确的图形验证码')
+        return false
+      }
+      return true
+    },
+
+    // 获取手机验证码
+    async getCode () {
+      // 在获取手机短信时进行验证
+      if (!this.verifyFn()) {
+        return
+      }
+
+      // 请求数据
+      const res = await getMsgCode(this.picCode, this.picKey, this.mobile)
+      console.log(res)
+      this.msgCode = '246810'
+      this.$toast('发送成功，请查看短信消息')
+
+      // 只有当没有计时器和初始状态时，开启计时器
+      if (!this.timerId && this.second === this.totalSecond) {
+        this.timerId = setInterval(() => {
+          // 离开页面定时器关不了
+          // console.log('定时器开启')
+          this.second--
+          // console.log(this.second)
+          // console.log(this.timerId)
+          // 关闭定时器
+          if (this.second <= 0) {
+            // console.log(111)
+            clearInterval(this.timerId)
+            this.timerId = null // 重置定时器
+            this.second = this.totalSecond // 重新归位
+          }
+        }, 1000)
+      }
+    },
+
+    // 短信验证码登录
+    async CodeLogin () {
+      this.verifyFn()
+
+      // 判断验证码
+      if (!/^\d{6}$/.test(this.msgCode)) {
+        this.$toast('请输入正确的验证码')
+        return
+      }
+      // 封装登录接口，实现登录
+      const res = await MsgCodeLogin(this.mobile, this.msgCode)
+      this.$store.commit('user/setUserInfo', res.data)
+      this.$toast('登录成功')
+      console.log(res)
+      // 获取地址栏中，传递过来的地址，如果没有返回首页
+      // console.log(this.$route.query.backUrl)
+      const url = this.$route.query.backUrl || '/'
+      // 跳转页面
+      this.$router.replace(url)
+    }
+  },
+
+  // 离开页面时关闭定时器
+  destroyed () {
+    // console.log(111)
+    clearInterval(this.timerId)
+  }
+}
+</script>
+
+<style lang="less">
+.container {
+  padding: 49px 29px;
+
+  .title {
+    margin-bottom: 20px;
+    h3 {
+      font-size: 26px;
+      font-weight: normal;
+    }
+    p {
+      line-height: 40px;
+      font-size: 14px;
+      color: #b8b8b8;
+    }
+  }
+
+  .form-item {
+    border-bottom: 1px solid #f3f1f2;
+    padding: 8px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    .inp {
+      display: block;
+      border: none;
+      outline: none;
+      height: 32px;
+      font-size: 14px;
+      flex: 1;
+    }
+    img {
+      width: 94px;
+      height: 31px;
+    }
+    button {
+      height: 31px;
+      border: none;
+      font-size: 13px;
+      color: #cea26a;
+      background-color: transparent;
+      padding-right: 9px;
+    }
+  }
+
+  .login-btn {
+    width: 100%;
+    height: 42px;
+    margin-top: 39px;
+    background: linear-gradient(90deg, #ecb53c, #ff9211);
+    color: #fff;
+    border-radius: 39px;
+    box-shadow: 0 10px 20px 0 rgba(0, 0, 0, 0.1);
+    letter-spacing: 2px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+}
+</style>
